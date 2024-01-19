@@ -1,34 +1,36 @@
 ﻿using BLL.Abstract;
 using Common.DTO;
 using Common.Security.Abstract;
+using DAL.Abstract;
 using DAL.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
 namespace BLL.Concrete
 {
     public class AccountService : IAccountService
     {
-        private readonly DEVELOP_MEYERContext _context;
+        private readonly IGenericRepository<MobileAppUser> _context;
         private readonly ITokenHandler _tokenHandler;
-        public AccountService(DEVELOP_MEYERContext context, ITokenHandler tokenHandler)
+        public AccountService(IGenericRepository<MobileAppUser> context, ITokenHandler tokenHandler)
         {
             _context = context;
             _tokenHandler = tokenHandler;
         }
-        public TokenDto Authenticate(LoginDto loginParameters)
+        public async Task<TokenDto> Authenticate(LoginDto loginParameters)
         {
             try
             {
 
-                var user = _context.MobileAppUsers.Where(x => x.SicilNo == loginParameters.Username).Where(x => x.Password == loginParameters.Password).FirstOrDefault();
+                var user = await _context.GetFirstOrDefaultAsync(x => x.SicilNo == loginParameters.Username && x.Password == loginParameters.Password);
 
                 if (user != null)
                 {
-                    return _tokenHandler.CreateToken(loginParameters.SicilId ?? 0);
+                    //Kullanıcı girişinde yeni token ve refresh token oluşturulur. 
+                    TokenDto token = _tokenHandler.CreateAccessToken(user.SicilNo ?? string.Empty);
+                    //Refresh token değeri ve geçerlilik süresi veritabanına kaydedilir.
+                    await _tokenHandler.UpdateRefreshTokenAsync(user, token.RefreshToken, token.RefreshTokenExpirationDate);
+
+                    return token;
                 }
                 else
                     return new TokenDto { IsSuccess = false, ErrorMessage = "User not found!" };
@@ -40,5 +42,27 @@ namespace BLL.Concrete
             }
         }
 
+        public async Task<TokenDto> RefreshTokenLoginAsync(string refreshToken)
+        {
+            try
+            {
+                //Access token süresi geçmiş ise refresh token kontrol edilir ve oturum süresini uzatmak için yeni bir access token oluşturulur.
+                var user = await _context.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
+                if (user != null && user?.RefreshTokenExpirationDate > DateTime.UtcNow)
+                {
+                    TokenDto token = _tokenHandler.CreateAccessToken(user.SicilNo ?? string.Empty);
+                    await _tokenHandler.UpdateRefreshTokenAsync(user, token.RefreshToken, token.RefreshTokenExpirationDate);
+
+                    return token;
+                }
+                else
+                    return new TokenDto { IsSuccess = false, ErrorMessage = "User not found!" };
+
+            }
+            catch (Exception ex)
+            {
+                return new TokenDto { IsSuccess = false, ErrorMessage = ex.Message };
+            }
+        }
     }
 }

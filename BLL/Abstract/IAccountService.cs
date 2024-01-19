@@ -1,4 +1,5 @@
 ﻿using Common.DTO;
+using DAL.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +10,6 @@ namespace BLL.Abstract
 {
     public interface IAccountService
     {
-        public TokenDto Authenticate(LoginDto loginParameters);
+        public Task<TokenDto> Authenticate(LoginDto loginParameters);
     }
 }

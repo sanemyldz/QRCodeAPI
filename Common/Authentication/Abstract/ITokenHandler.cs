@@ -1,4 +1,5 @@
 ﻿using Common.DTO;
+using DAL.Models;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
@@ -10,8 +11,9 @@ namespace Common.Security.Abstract
 {
     public interface ITokenHandler
     {
-        public TokenDto CreateToken(int sicilId);
+        public TokenDto CreateAccessToken(string sicilNo);
         string CreateRefreshToken();
+        Task UpdateRefreshTokenAsync(MobileAppUser user, string? refreshToken, DateTime? refreshTokenExpirationDate);
 
     }
 }
