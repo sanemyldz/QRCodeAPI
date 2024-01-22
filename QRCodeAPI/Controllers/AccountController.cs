@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace QRCodeAPI.Controllers
 {
@@ -18,9 +19,11 @@ namespace QRCodeAPI.Controllers
     public class AccountController : ControllerBase
     {
         private readonly IAccountService _accountService;
-        public AccountController(IAccountService accountService)
+        private readonly ITokenBlacklistService _tokenBlacklistService;
+        public AccountController(IAccountService accountService, ITokenBlacklistService tokenBlacklistService)
         {
             _accountService = accountService;
+            _tokenBlacklistService = tokenBlacklistService;
         }
         [Route("/Login")]
         [HttpPost]
@@ -32,11 +35,13 @@ namespace QRCodeAPI.Controllers
         }
         [Route("/Logout")]
         [HttpGet]
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout()
         {
-            HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            var token = HttpContext.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
+
+            _tokenBlacklistService.BlacklistToken(token);
+
             return Ok();
         }
-
     }
 }

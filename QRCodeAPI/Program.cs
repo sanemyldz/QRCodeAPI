@@ -1,11 +1,14 @@
 ﻿using BLL.Abstract;
 using BLL.Concrete;
+using Common;
 using Common.Security.Abstract;
 using DAL.Abstract;
 using DAL.Concrete;
 using DAL.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
@@ -21,7 +24,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         ValidateIssuer = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-
+        
         ValidIssuer = builder.Configuration["Token:Issuer"],
         ValidAudience = builder.Configuration["Token:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Token:SecurityKey"])),
@@ -70,29 +73,35 @@ builder.Services.AddSwaggerGen(options =>
                 });
 });
 
-builder.Services.AddDbContext<DEVELOP_MEYERContext>();
+//builder.Services.AddDbContext<DEVELOP_MEYERContext>();
+builder.Services.AddDbContext<DEVELOP_MEYERContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DbConnect")));
+
+
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IQRService, QRService>();
 builder.Services.AddScoped<ITokenHandler, Common.Security.Concrete.TokenHandler>();
+builder.Services.AddSingleton<ITokenBlacklistService, TokenBlacklistService>();
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+app.UseMiddleware<TokenBlackListMiddleware>();
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
 
 app.UseAuthorization();
-app.UseAuthentication();
 
 app.MapControllers();
 
